@@ -1,0 +1,24 @@
+name: Daily Weather Bot
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # Запуск в 12:00 UTC (утро в Нью-Йорке)
+  workflow_dispatch:      # Позволяет запускать вручную кнопкой
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run bot
+        run: python bot.py
