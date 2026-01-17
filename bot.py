@@ -7,50 +7,60 @@ def send_weather():
     api_key = "c0bd6d7ddeab510249e24bc31bf6de61"
     city = "New York"
     
-    # Получаем данные (прогноз включает и текущую погоду)
     url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
     res = requests.get(url).json()
     
-    if res["cod"] != "200":
-        print("Error")
-        return
+    if res["cod"] != "200": return
 
-    # Данные НА СЕЙЧАС
+    # Текущие данные
     curr = res['list'][0]
     temp = round(curr['main']['temp'])
+    feels_like = round(curr['main']['feels_like'])
     desc = curr['weather'][0]['description'].capitalize()
     hum = curr['main']['humidity']
     wind = curr['wind']['speed']
     
-    # Данные НА ЗАВТРА
-    tomorrow = res['list'][8]
-    temp_tom = round(tomorrow['main']['temp'])
-    desc_tom = tomorrow['weather'][0]['description']
+    # Завтра
+    tom = res['list'][8]
+    temp_tom = round(tom['main']['temp'])
 
-    # Время в Нью-Йорке
+    # Логика советов (Style Guide)
+    if feels_like < 0:
+        advice = "It's freezing! Heavy parka, thermal wear, and a scarf are a must. ❄️🧣"
+    elif feels_like < 10:
+        advice = "Chilly morning. A warm coat or a down jacket is recommended. 🧥"
+    elif feels_like < 20:
+        advice = "Mild weather. A light jacket, trench coat, or hoodie is perfect. 🧥👟"
+    else:
+        advice = "Warm day! T-shirt and light pants are enough. 👕🕶️"
+
+    if "rain" in desc.lower():
+        advice += " Don't forget your umbrella or a raincoat! ☂️"
+
+    # Время
     tz_ny = pytz.timezone('America/New_York')
     time_ny = datetime.now(tz_ny).strftime("%I:%M %p")
 
-    # Формируем красивый Embed
     payload = {
         "embeds": [{
-            "title": f"🗽 NYC Weather Station",
-            "description": f"Update for **{time_ny}** (Local Time)",
-            "color": 16750848,
+            "title": "🏙️ NYC Daily Style & Weather",
+            "description": f"Update for **{time_ny}** in New York",
+            "color": 3447003,
             "fields": [
-                {"name": "🌡 Temperature", "value": f"**{temp}°C**", "inline": True},
-                {"name": "☁️ Condition", "value": f"{desc}", "inline": True},
+                {"name": "🌡️ Temp", "value": f"**{temp}°C**", "inline": True},
+                {"name": "🤔 Feels Like", "value": f"**{feels_like}°C**", "inline": True},
+                {"name": "☁️ Sky", "value": f"{desc}", "inline": True},
                 {"name": "💧 Humidity", "value": f"{hum}%", "inline": True},
-                {"name": "💨 Wind Speed", "value": f"{wind} m/s", "inline": True},
-                {"name": "📅 Tomorrow", "value": f"**{temp_tom}°C**, {desc_tom}", "inline": False},
-                {"name": "💡 Advice", "value": f"{'Wear a warm coat!' if temp < 10 else 'Enjoy the day!'}", "inline": False}
+                {"name": "💨 Wind", "value": f"{wind} m/s", "inline": True},
+                {"name": "📅 Tomorrow", "value": f"Around **{temp_tom}°C**", "inline": True},
+                {"name": "🧥 What to wear today?", "value": f"**{advice}**", "inline": False}
             ],
-            "footer": {"text": "Automatic Daily Report"}
+            "footer": {"text": "Your personal NYC assistant"},
+            "timestamp": datetime.utcnow().isoformat()
         }]
     }
     
     requests.post(webhook_url, json=payload)
-    print("Full report sent!")
 
 if __name__ == "__main__":
     send_weather()
