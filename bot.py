@@ -2,69 +2,77 @@ import requests
 from datetime import datetime
 import pytz
 
-def send_weather():
-    webhook_url = "https://discord.com/api/webhooks/1461880415060103229/VQYgZcfN_ql1q7g6b6qSdo1Sv1oT8dM0W0iQzPK1xnFDHLk7aUWrs93_LKsPy-SYdpsp"
+def send_reports():
+    # --- НАСТРОЙКИ ---
+    tg_token = "8544880820:AAH3dSWrP8kVQZ2tXKnOYzUBSDbjZxhN83M" 
+    tg_chat_id = "@MyNYCChannel"
+    discord_url = "https://discord.com/api/webhooks/1461880415060103229/VQYgZcfN_ql1q7g6b6qSdo1Sv1oT8dM0W0iQzPK1xnFDHLk7aUWrs93_LKsPy-SYdpsp"
+    
     api_key = "c0bd6d7ddeab510249e24bc31bf6de61"
     city = "New York"
     
-    # 1. Получаем координаты
-    geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={api_key}"
-    geo_res = requests.get(geo_url).json()
-    lat, lon = geo_res[0]['lat'], geo_res[0]['lon']
+    # 1. Получаем данные (Погода + Гео)
+    try:
+        geo = requests.get(f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={api_key}").json()
+        lat, lon = geo[0]['lat'], geo[0]['lon']
+        
+        w = requests.get(f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric").json()
+        aqi_res = requests.get(f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={api_key}").json()
+        
+        temp = round(w['main']['temp'])
+        feels = round(w['main']['feels_like'])
+        desc = w['weather'][0]['description'].capitalize()
+        hum = w['main']['humidity']
+        wind = w['wind']['speed']
+        aqi_val = aqi_res['list'][0]['main']['aqi']
+        aqi_desc = {1: "Excellent ✅", 2: "Fair 🟢", 3: "Moderate 🟡", 4: "Poor 🟠", 5: "Dangerous 🔴"}[aqi_val]
+        
+        # Совет по стилю
+        if feels < 5:
+            advice = "Heavy winter coat & scarf. It's freezing! ❄️"
+        elif feels < 15:
+            advice = "Warm jacket or a light down coat. 🧥"
+        elif feels < 22:
+            advice = "Hoodie or a light trench coat. 🧥👟"
+        else:
+            advice = "T-shirt and shorts. Stay cool! 👕"
 
-    # 2. Получаем текущую погоду и УФ-индекс
-    # (У OpenWeatherMap УФ-индекс входит в One Call или запрашивается отдельно, 
-    # но в базовом API мы берем данные о погоде и загрязнении)
-    w_url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
-    w_res = requests.get(w_url).json()
+        time_ny = datetime.now(pytz.timezone('America/New_York')).strftime("%I:%M %p")
 
-    # 3. Качество воздуха (AQI)
-    aqi_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={api_key}"
-    aqi_res = requests.get(aqi_url).json()
-    aqi_val = aqi_res['list'][0]['main']['aqi']
-    aqi_desc = {1: "Excellent ✅", 2: "Fair 🟢", 3: "Moderate 🟡", 4: "Poor 🟠", 5: "Dangerous 🔴"}[aqi_val]
+        # --- ОТПРАВКА В DISCORD ---
+        discord_payload = {
+            "embeds": [{
+                "title": "🏙️ NYC Style & Weather",
+                "description": f"Update for **{time_ny}**",
+                "color": 15418782,
+                "fields": [
+                    {"name": "🌡️ Temp", "value": f"{temp}°C (Feels {feels}°C)", "inline": True},
+                    {"name": "🍃 Air Quality", "value": f"{aqi_desc}", "inline": True},
+                    {"name": "🧥 Style Guide", "value": f"**{advice}**", "inline": False}
+                ],
+                "footer": {"text": "NYC Style Station"}
+            }]
+        }
+        requests.post(discord_url, json=discord_payload)
 
-    temp = round(w_res['main']['temp'])
-    feels_like = round(w_res['main']['feels_like'])
-    desc = w_res['weather'][0]['description'].capitalize()
-    hum = w_res['main']['humidity']
-    wind = w_res['wind']['speed']
+        # --- ОТПРАВКА В TELEGRAM ---
+        tg_text = (
+            f"🏙 <b>NYC Style & Weather</b>\n"
+            f"<i>Local Time: {time_ny}</i>\n\n"
+            f"🌡 <b>Temp:</b> {temp}°C (Feels like {feels}°C)\n"
+            f"🌤 <b>Sky:</b> {desc}\n"
+            f"🍃 <b>Air Quality:</b> {aqi_desc}\n"
+            f"💨 <b>Wind:</b> {wind} m/s\n\n"
+            f"🧥 <b>What to wear:</b>\n{advice}\n\n"
+            f"🗽 Stay Sharp, New York!"
+        )
+        tg_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+        requests.post(tg_url, data={"chat_id": tg_chat_id, "text": tg_text, "parse_mode": "HTML"})
+        
+        print("Success! Reports sent to Discord and Telegram.")
 
-    # Расширенная логика советов по одежде
-    if feels_like < 0:
-        style_advice = "Heavy winter coat, thermal layers, and gloves. It's freezing! ❄️"
-    elif feels_like < 10:
-        style_advice = "A warm wool coat or down jacket. Don't forget a scarf. 🧥"
-    elif feels_like < 18:
-        style_advice = "Light jacket, denim, or a trench coat. Perfect layered look. 🧥👟"
-    else:
-        style_advice = "T-shirt and light trousers. Enjoy the warmth! 👕"
-
-    if "rain" in desc.lower():
-        style_advice += " + Waterproof shoes and an umbrella! ☂️"
-
-    # Время в Нью-Йорке
-    tz_ny = pytz.timezone('America/New_York')
-    time_ny = datetime.now(tz_ny).strftime("%I:%M %p")
-
-    payload = {
-        "embeds": [{
-            "title": "🏙️ NYC Style & Weather",
-            "description": f"Daily update for New Yorkers | **{time_ny}**",
-            "color": 15418782, # Стильный золотисто-оранжевый
-            "fields": [
-                {"name": "🌡️ Temperature", "value": f"**{temp}°C** (Feels like {feels_like}°C)", "inline": False},
-                {"name": "🌤️ Sky Condition", "value": f"{desc}", "inline": True},
-                {"name": "💨 Wind", "value": f"{wind} m/s", "inline": True},
-                {"name": "🍃 Air Quality", "value": f"{aqi_desc}", "inline": True},
-                {"name": "🧥 Style Guide", "value": f"**{style_advice}**", "inline": False}
-            ],
-            "footer": {"text": "NYC Style Station • Stay Sharp, Stay Ready"},
-            "timestamp": datetime.utcnow().isoformat()
-        }]
-    }
-    
-    requests.post(webhook_url, json=payload)
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
-    send_weather()
+    send_reports()
