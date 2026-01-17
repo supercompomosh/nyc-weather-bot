@@ -13,6 +13,6 @@ jobs:
         with:
           python-version: '3.9'
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests pytz
       - name: Run script
         run: python bot.py
